@@ -1,6 +1,7 @@
 const express = require('express'); // Import Express
 const bodyParser = require('body-parser'); // Import body-parser
 const cors = require('cors'); // Import cors
+const path = require('path'); // Import path for serving static files
 
 const app = express(); // Initialize Express app
 const PORT = process.env.PORT || 3000;
@@ -8,10 +9,11 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(bodyParser.json()); // Parse JSON requests
 app.use(cors()); // Enable CORS for all origins
+app.use('/static', express.static(path.join(__dirname, 'static'))); // Serve the static folder
 
-// Root route
+// Serve the frontend HTML (index.html in the root folder)
 app.get('/', (req, res) => {
-    res.send('AI-Based Disaster Prediction and Response System is running!');
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // POST /predict route
@@ -29,9 +31,6 @@ app.post('/predict', (req, res) => {
 
     res.json({ prediction, data: { location, risk_factor } });
 });
-
-
-
 
 // Start the server
 app.listen(PORT, () => {
