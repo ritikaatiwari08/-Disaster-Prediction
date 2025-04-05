@@ -36,9 +36,3 @@ YOLOv5 object detection model analyzes imagery and videos to locate and identify
 ## Prerequisites
 - Git, Git LFS, Python, pip, Node.js, npm.
 
-## Installation
-1. Install Git LFS from the [Git LFS Installation Page](https://git-lfs.github.com/).
-2. Clone the repository:
-   ```bash
-   git clone https://github.com/t-abs/AI-Based-Disaster-Prediction-and-Response-System
-   cd Predicaster
