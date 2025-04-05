@@ -4,45 +4,142 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI-Based Disaster Prediction</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        #map {
+            height: 400px;
+            margin-top: 20px;
+        }
+        input, button {
+            padding: 10px;
+            margin: 10px 0;
+            width: 100%;
+            max-width: 400px;
+            display: block;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            max-width: 400px;
+            display: none;
+        }
+        .badge {
+            padding: 5px 10px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+        }
+        .low {
+            background-color: #4CAF50;
+        }
+        .medium {
+            background-color: #FF9800;
+        }
+        .high {
+            background-color: #f44336;
+        }
+        #spinner {
+            display: none;
+            margin-top: 20px;
+        }
+    </style>
+    
 </head>
 <body>
     <h1>AI-Based Disaster Prediction</h1>
-    <label for="location">Location:</label>
-    <select id="location">
-        <option value="Mountain Region">Mountain Region</option>
-        <option value="Coastal Region">Coastal Region</option>
-        <option value="Plains">Plains</option>
-    </select>
-    <br>
-    <label for="riskFactor">Risk Factor:</label>
-    <input type="number" id="riskFactor" />
-    <br>
-    <button id="predictButton">Predict</button>
-    <h2>Prediction:</h2>
-    <p id="prediction"></p>
 
-    <!-- Fetch Logic -->
+    <label for="location">Enter or Select Location:</label>
+    <input type="text" id="location" placeholder="Start typing a location...">
+    <button onclick="predictDisaster()">Predict</button>
+
+    <div id="map"></div>
+
+    <div id="spinner">
+        <img src="https://i.gifer.com/ZZ5H.gif" alt="Loading..." width="50">
+        <p>Fetching prediction...</p>
+    </div>
+
+    <div id="result">
+        <strong>Prediction:</strong> <span id="prediction">--</span><br>
+        <strong>Risk Level:</strong> <span id="risk">--</span><br>
+        <strong>Precautions:</strong> <span id="precautions">--</span>
+    </div>
     <script>
-        document.getElementById("predictButton").addEventListener("click", function () {
-            fetch("http://localhost:3000/predict", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    location: document.getElementById("location").value,
-                    risk_factor: parseFloat(document.getElementById("riskFactor").value),
-                }),
-            })
-                .then((response) => response.json())
-                .then((data) => {
-                    document.getElementById("prediction").innerText = data.prediction;
-                })
-                .catch((error) => {
-                    console.error("Error:", error);
-                    document.getElementById("prediction").innerText = "Error: Failed to fetch";
+        function initAutocomplete() {
+            const input = document.getElementById("location");
+            const autocomplete = new google.maps.places.Autocomplete(input);
+        }
+        google.maps.event.addDomListener(window, 'load', initAutocomplete);
+    
+        var map = L.map('map').setView([20.5937, 78.9629], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    
+        map.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+    
+            fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+                .then(res => res.json())
+                .then(data => {
+                    const locationName = data.address.state || data.address.city || data.display_name;
+                    document.getElementById('location').value = locationName;
                 });
         });
+    
+        function predictDisaster() {
+            const location = document.getElementById('location').value;
+    
+            document.getElementById('spinner').style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+    
+            fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ location })
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('prediction').textContent = data.prediction || 'N/A';
+                
+                const riskElem = document.getElementById('risk');
+                const riskLevel = data.risk?.toLowerCase();
+    
+                riskElem.textContent = data.risk || 'N/A';
+                riskElem.className = 'badge';  // Reset class
+                if (riskLevel === 'low') riskElem.classList.add('low');
+                else if (riskLevel === 'medium') riskElem.classList.add('medium');
+                else if (riskLevel === 'high') riskElem.classList.add('high');
+    
+                document.getElementById('precautions').textContent = data.precautions || 'N/A';
+    
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('result').style.display = 'block';
+            })
+            .catch(error => {
+                document.getElementById('prediction').textContent = 'Error';
+                document.getElementById('risk').textContent = 'Error';
+                document.getElementById('precautions').textContent = 'Error fetching data';
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('result').style.display = 'block';
+            });
+        }
     </script>
+    
+    
 </body>
 </html>

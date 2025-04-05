@@ -1,48 +1,78 @@
-from flask import Flask, render_template, request, send_file
-import os
-import subprocess
-from werkzeug.utils import secure_filename
+from flask import Flask, request, jsonify, render_template
+import requests
 
 app = Flask(__name__)
 
-# Path setup
-UPLOAD_FOLDER = "static/uploads"
-PROCESSED_FOLDER = "static/processed"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(PROCESSED_FOLDER, exist_ok=True)
+location_disaster_data = {
+    "uttarakhand": {
+        "disaster": "Landslide",
+        "risk": "High",
+        "precautions": "Avoid hilly areas, stay alert, follow local news."
+    },
+    "gujarat": {
+        "disaster": "Earthquake",
+        "risk": "Medium",
+        "precautions": "Drop, Cover, and Hold On during tremors."
+    },
+    "mumbai": {
+        "disaster": "Flood",
+        "risk": "High",
+        "precautions": "Avoid waterlogged areas and stay indoors."
+    },
+    "rajasthan": {
+        "disaster": "Heatwave",
+        "risk": "Medium",
+        "precautions": "Stay hydrated and avoid outdoor activities."
+    },
+    "bihar": {
+        "disaster": "Flood",
+        "risk": "High",
+        "precautions": "Move to higher ground and stay alert."
+    }
+    # Add more locations here...
+}
 
-@app.route("/")
+def get_country_from_location(location):
+    url = f"https://nominatim.openstreetmap.org/search?q={location}&format=json&addressdetails=1"
+    try:
+        res = requests.get(url).json()
+        return res[0]['address'].get('country', '') if res else ''
+    except:
+        return ''
+
+def get_reliefweb_disasters(country):
+    api_url = f"https://api.reliefweb.int/v1/disasters?appname=apidoc&profile=full&filter[field]=country&filter[value]={country}&sort[]=date:desc&limit=3"
+    try:
+        res = requests.get(api_url).json()
+        disasters = res.get("data", [])
+        return [d["fields"]["name"] for d in disasters]
+    except:
+        return []
+
+@app.route('/')
 def home():
-    return render_template("index.html")
+    return render_template('index.html')
 
-@app.route("/detect", methods=["POST"])
-def detect():
-    video = request.files.get("video")
-    if not video:
-        return "No video uploaded", 400
-    
-    # Save the uploaded video
-    filename = secure_filename(video.filename)
-    video_path = os.path.join(UPLOAD_FOLDER, filename)
-    video.save(video_path)
+@app.route('/predict', methods=['POST'])
+def predict():
+    data = request.get_json()
+    location = data.get('location', '').lower()
+    result = location_disaster_data.get(location, {
+        "disaster": "Unknown",
+        "risk": "Low",
+        "precautions": "No major risks reported."
+    })
 
-    # YOLOv5 detection
-    output_dir = os.path.join(PROCESSED_FOLDER, filename.split('.')[0])
-    os.makedirs(output_dir, exist_ok=True)
-    subprocess.run([
-        "python", "yolov5/detect.py",
-        "--source", video_path,
-        "--weights", "yolov5s.pt",
-        "--project", output_dir,
-        "--name", "results"
-    ])
+    # Get country and live disaster updates
+    country = get_country_from_location(location)
+    recent_disasters = get_reliefweb_disasters(country)
 
-    # Locate processed video or images
-    processed_path = os.path.join(output_dir, "results")
-    if os.path.exists(processed_path):
-        return f"Detection complete. Check the processed results in {processed_path}", 200
-    else:
-        return "Detection failed. Please check logs.", 500
+    return jsonify({
+        "prediction": result['disaster'],
+        "risk": result['risk'],
+        "precautions": result['precautions'],
+        "recent_disasters": recent_disasters
+    })
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True)
